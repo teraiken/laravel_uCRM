@@ -22,6 +22,11 @@ class Customer extends Model
         'memo'
     ];
 
+    public function purchases()
+    {
+        return $this->hasMany(Purchase::class);
+    }
+
     public function scopeSearchCustomers($query, string $input = null)
     {
         if (!empty($input)) {
