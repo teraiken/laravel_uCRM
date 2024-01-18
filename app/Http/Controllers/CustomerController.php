@@ -33,9 +33,7 @@ class CustomerController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('Customers/Create', [
-            'gender' => CustomerGender::cases()
-        ]);
+        return Inertia::render('Customers/Create');
     }
 
     /**
