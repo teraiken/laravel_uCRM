@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
 {
@@ -37,5 +38,13 @@ class Customer extends Model
         return $query->when($input, fn(Builder $q)
             => $q->when(Customer::where('kana', 'like', $input . '%')->orWhere('tel', 'like', $input . '%')->exists(), fn(Builder $q)
             => $q->where('kana', 'like', $input . '%')->orWhere('tel', 'like', $input . '%')));
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function purchases(): HasMany
+    {
+        return $this->hasMany(Purchase::class);
     }
 }
