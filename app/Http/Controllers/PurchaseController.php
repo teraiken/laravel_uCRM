@@ -7,8 +7,8 @@ use App\Models\Purchase;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePurchaseRequest;
 use App\Http\Requests\UpdatePurchaseRequest;
-use App\Models\Customer;
 use App\Models\Item;
+use App\Models\Order;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -17,13 +17,18 @@ use Inertia\Response;
 class PurchaseController extends Controller
 {
     /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
-    public function index()
+    public function index(): Response
     {
-        //
+        $perPage = 50;
+        $orders = Order::groupBy('id')
+            ->selectRaw('id, sum(subtotal) as total, customer_name, status, created_at')
+            ->paginate($perPage);
+        
+        return Inertia::render('Purchases/Index', [
+            'orders' => $orders
+        ]);
     }
 
     /**
@@ -61,37 +66,87 @@ class PurchaseController extends Controller
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Purchase  $purchase
-     * @return \Illuminate\Http\Response
+     * @param Purchase $purchase
+     * @return Response
      */
-    public function show(Purchase $purchase)
+    public function show(Purchase $purchase): Response
     {
-        //
+        $items = Order::where('id', $purchase->id)->orderBy('item_id')->get();
+
+        $order = Order::groupBy('id')
+            ->where('id', $purchase->id)
+            ->selectRaw('id, sum(subtotal) as total, customer_name, status, created_at')
+            ->get();
+
+        return Inertia::render('Purchases/Show', [
+            'items' => $items,
+            'order' => $order
+        ]);
     }
 
     /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Purchase  $purchase
-     * @return \Illuminate\Http\Response
+     * @param Purchase $purchase
+     * @return Response
      */
-    public function edit(Purchase $purchase)
+    public function edit(Purchase $purchase): Response
     {
-        //
+        $purchase = Purchase::find($purchase->id);
+        $allItems = Item::select('id', 'name', 'price')->get();
+        $items = [];
+
+        foreach ($allItems as $allItem) {
+            $quantity = 0;
+
+            foreach($purchase->items as $item) {
+                if ($allItem->id === $item->id) {
+                    $quantity = $item->pivot->quantity;
+                }
+            }
+
+            array_push($items, [
+                'id' => $allItem->id,
+                'name' => $allItem->name,  
+                'price' => $allItem->price,  
+                'quantity' => $quantity,  
+            ]);
+        }
+
+        $order = Order::groupBy('id')
+            ->where('id', $purchase->id)
+            ->selectRaw('id, customer_id, customer_name, status, created_at')
+            ->get();
+        
+        return Inertia::render('Purchases/Edit', [
+            'items' => $items,
+            'order' => $order
+        ]);
     }
 
     /**
-     * Update the specified resource in storage.
-     *
-     * @param  \App\Http\Requests\UpdatePurchaseRequest  $request
-     * @param  \App\Models\Purchase  $purchase
-     * @return \Illuminate\Http\Response
+     * @param UpdatePurchaseRequest $request
+     * @param Purchase $purchase
+     * @return RedirectResponse
      */
-    public function update(UpdatePurchaseRequest $request, Purchase $purchase)
+    public function update(UpdatePurchaseRequest $request, Purchase $purchase): RedirectResponse
     {
-        //
+        DB::transaction(function () use ($request, $purchase) {
+            $purchase->status = $request->status;
+            $purchase->save();
+            
+            $items = [];
+
+            foreach($request->items as $item) {
+                $items = $items + [
+                    $item['id'] => [
+                        'quantity' => $item['quantity']
+                    ]
+                ];
+            }
+
+            $purchase->items()->sync($items);
+        });
+
+        return to_route('dashboard');
     }
 
     /**
