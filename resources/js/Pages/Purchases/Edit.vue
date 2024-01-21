@@ -48,6 +48,7 @@ const updatePurchase = id => {
             })
         }
     })
+    
     Inertia.put(route('purchases.update', { purchase: id }), form)
 }
 
